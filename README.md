@@ -44,10 +44,10 @@ The pipeline logs row and class counts at load, leaky-column removal, deduplicat
 
 ### Edge-IIoTset comparison
 
-Download the labeled Edge-IIoTset CSV from its official distributor and place it at `data/raw/edge_iiotset.csv`. The comparison config assumes the standard multiclass column `Attack_type` and binary column `Attack_label`; verify those names with `python -c "import pandas as pd; print(pd.read_csv('data/raw/edge_iiotset.csv', nrows=0).columns.tolist())"` before running:
+Download the labeled Edge-IIoTset CSV from the public [Kaggle dataset mirror](https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot) and place it at `data/raw/edge_iiotset.csv`. The comparison config assumes the standard multiclass column `Attack_type` and binary column `Attack_label`; this archive was confirmed to contain both. Verify any future replacement file with `python -c "import pandas as pd; print(pd.read_csv('data/raw/edge_iiotset.csv', nrows=0).columns.tolist())"` before running:
 
 ```bash
-python -m src.data data/raw/edge_iiotset.csv data/processed/edge_iiotset --label-column Attack_type --drop-column Attack_label
+python -m src.data data/raw/edge_iiotset.csv data/processed/edge_iiotset --label-column Attack_type --drop-column Attack_label --drop-column frame.time --drop-column ip.src_host --drop-column ip.dst_host --drop-column http.request.full_uri --drop-column tcp.options --drop-column tcp.payload --drop-column tcp.srcport
 python -m src.train_baseline --config configs/edge_iiotset.yaml --dataset-name edge_iiotset
 ```
 

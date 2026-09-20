@@ -87,6 +87,8 @@ def prepare_dataset(
 
     numeric_columns = frame.select_dtypes(include=[np.number]).columns.tolist()
     categorical_columns = [column for column in frame.columns if column not in numeric_columns]
+    if categorical_columns:
+        frame[categorical_columns] = frame[categorical_columns].astype("string")
     numeric_pipeline = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())])
     categorical_pipeline = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False))])
     transformer = ColumnTransformer([

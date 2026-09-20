@@ -1,0 +1,2 @@
+dataset,model,method,attack,malicious_fraction,alpha,seed,round,accuracy,macro_f1,precision,recall,fpr,params,model_kb,bytes_per_round,round_time_s
+edge_iiotset,mlp,centralized,none,NA,NA,42,NA,0.8790445832059736,0.8517486272420141,0.8819056408146937,0.8528182146906207,0.00863071694155169,79247,309.559,NA,27.115
