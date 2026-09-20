@@ -1,0 +1,12 @@
+dataset: data/raw/edge_iiotset.csv
+processed_dir: data/processed/edge_iiotset
+label_column: Attack_type
+drop_columns: [Attack_label]
+seed: 42
+validation_size: 0.15
+test_size: 0.15
+hidden_dims: [128, 64]
+epochs: 30
+batch_size: 256
+learning_rate: 0.001
+weight_decay: 0.00001

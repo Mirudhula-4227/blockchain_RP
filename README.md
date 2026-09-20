@@ -42,6 +42,17 @@ python -m src.data data/raw/pb_fdgan.csv data/processed/pb_fdgan --label-column 
 
 The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/pb_fdgan/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.
 
+### Edge-IIoTset comparison
+
+Download the labeled Edge-IIoTset CSV from its official distributor and place it at `data/raw/edge_iiotset.csv`. The comparison config assumes the standard multiclass column `Attack_type` and binary column `Attack_label`; verify those names with `python -c "import pandas as pd; print(pd.read_csv('data/raw/edge_iiotset.csv', nrows=0).columns.tolist())"` before running:
+
+```bash
+python -m src.data data/raw/edge_iiotset.csv data/processed/edge_iiotset --label-column Attack_type --drop-column Attack_label
+python -m src.train_baseline --config configs/edge_iiotset.yaml --dataset-name edge_iiotset
+```
+
+This produces `results/edge_iiotset_results.csv` using the same schema as PB-fdGAN and ToN-IoT.
+
 ## Centralized baseline
 
 ```bash
