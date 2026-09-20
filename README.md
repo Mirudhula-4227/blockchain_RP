@@ -28,17 +28,19 @@ Docker prerequisite: run `docker run --rm hello-world` after installing Docker D
 
 ## Dataset handoff
 
-To keep day one moving, the primary fallback is **ToN-IoT**, the official UNSW Industry 4.0/IIoT dataset. Its official project page is [UNSW ToN-IoT Datasets](https://research.unsw.edu.au/projects/toniot-datasets), which links the academic-use download archive. B should still confirm whether the base paper used another dataset before reporting final comparison numbers. Download the selected labeled CSV and place it at `data/raw/primary.csv`; do not commit raw data.
+The base-paper dataset is **PB-fdGAN**. Download its labeled source file as `data/raw/pb_fdgan.csv` and set `label_column` plus any additional leaky target columns in `configs/baseline.yaml` after inspecting the file header. Do not commit raw data. The current ToN-IoT network run is retained as a fallback/comparison experiment, not as the base-paper result.
+
+The fallback source is **ToN-IoT**, the official UNSW Industry 4.0/IIoT dataset. Its official project page is [UNSW ToN-IoT Datasets](https://research.unsw.edu.au/projects/toniot-datasets), which links the academic-use download archive.
 
 The official UNSW page describes raw, processed, train/test, feature-description, and ground-truth directories. Prefer the processed or train/test CSV that contains the selected label column. If the downloaded archive has multiple files, choose one documented dataset slice and record its exact filename in the experiment notes before combining files.
 
 Inspect and process it:
 
 ```bash
-python -m src.data data/raw/primary.csv data/processed/primary --label-column type --drop-column label
+python -m src.data data/raw/pb_fdgan.csv data/processed/pb_fdgan --label-column label
 ```
 
-The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/primary/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.
+The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/pb_fdgan/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.
 
 ## Centralized baseline
 
@@ -46,7 +48,7 @@ The pipeline logs row and class counts at load, leaky-column removal, deduplicat
 python -m src.train_baseline --config configs/baseline.yaml
 ```
 
-Outputs include `results/primary_results.csv`, a JSON classification report, and the PyTorch state dict. Every experiment must preserve this CSV schema:
+Outputs include a dataset-specific results CSV, a JSON classification report, and the PyTorch state dict. Every experiment must preserve this CSV schema:
 
 ```text
 dataset,model,method,attack,malicious_fraction,alpha,seed,round,accuracy,macro_f1,precision,recall,fpr,params,model_kb,bytes_per_round,round_time_s
