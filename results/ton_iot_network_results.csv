@@ -1,0 +1,2 @@
+dataset,model,method,attack,malicious_fraction,alpha,seed,round,accuracy,macro_f1,precision,recall,fpr,params,model_kb,bytes_per_round,round_time_s
+ton_iot_network,mlp,centralized,none,NA,NA,42,NA,0.7231472879296791,0.5093482903065304,0.6677450723017728,0.554863797163771,0.03300124000032063,110794,432.789,NA,13.621

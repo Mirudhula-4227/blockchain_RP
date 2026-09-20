@@ -35,7 +35,7 @@ The official UNSW page describes raw, processed, train/test, feature-description
 Inspect and process it:
 
 ```bash
-python -m src.data data/raw/primary.csv data/processed/primary --label-column label
+python -m src.data data/raw/primary.csv data/processed/primary --label-column type --drop-column label
 ```
 
 The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/primary/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.

@@ -58,8 +58,9 @@ def evaluate_model(model: nn.Module, x_test: np.ndarray, y_test: np.ndarray) -> 
         predictions = model(torch.from_numpy(x_test)).argmax(dim=1).numpy()
     matrix = confusion_matrix(y_test, predictions)
     false_positive = matrix.sum(axis=0) - np.diag(matrix)
-    actual_negative = matrix.sum(axis=1) - np.diag(matrix)
-    per_class_fpr = np.divide(false_positive, actual_negative, out=np.zeros_like(false_positive, dtype=float), where=actual_negative != 0)
+    true_negative = matrix.sum() - matrix.sum(axis=0) - matrix.sum(axis=1) + np.diag(matrix)
+    negative_cases = false_positive + true_negative
+    per_class_fpr = np.divide(false_positive, negative_cases, out=np.zeros_like(false_positive, dtype=float), where=negative_cases != 0)
     return {"accuracy": accuracy_score(y_test, predictions), "macro_f1": f1_score(y_test, predictions, average="macro", zero_division=0), "precision": precision_score(y_test, predictions, average="macro", zero_division=0), "recall": recall_score(y_test, predictions, average="macro", zero_division=0), "fpr": float(per_class_fpr.mean()), "classification_report": classification_report(y_test, predictions, output_dict=True, zero_division=0), "predictions": predictions.tolist()}
 
 

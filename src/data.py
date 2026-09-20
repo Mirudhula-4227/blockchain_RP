@@ -48,6 +48,7 @@ def prepare_dataset(
     raw_path: str | Path,
     output_dir: str | Path,
     label_column: str,
+    drop_columns: list[str] | None = None,
     validation_size: float = 0.15,
     test_size: float = 0.15,
     seed: int = 42,
@@ -62,6 +63,10 @@ def prepare_dataset(
     logs: list[dict[str, Any]] = [{"step": "loaded", "rows": len(frame), "label_counts": _counts(frame[label_column])}]
 
     frame, dropped_columns = _drop_leaky_columns(frame, label_column)
+    explicit_drop_columns = [column for column in (drop_columns or []) if column in frame.columns and column != label_column]
+    if explicit_drop_columns:
+        frame = frame.drop(columns=explicit_drop_columns)
+        dropped_columns.extend(explicit_drop_columns)
     logs.append({"step": "dropped_identifier_and_leaky_columns", "rows": len(frame), "dropped_columns": dropped_columns, "label_counts": _counts(frame[label_column])})
     before_dedup = len(frame)
     frame = frame.drop_duplicates().reset_index(drop=True)
@@ -114,11 +119,12 @@ def main() -> None:
     parser.add_argument("raw_path")
     parser.add_argument("output_dir")
     parser.add_argument("--label-column", default="label")
+    parser.add_argument("--drop-column", action="append", default=[])
     parser.add_argument("--validation-size", type=float, default=0.15)
     parser.add_argument("--test-size", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    metadata = prepare_dataset(args.raw_path, args.output_dir, args.label_column, args.validation_size, args.test_size, args.seed)
+    metadata = prepare_dataset(args.raw_path, args.output_dir, args.label_column, args.drop_column, args.validation_size, args.test_size, args.seed)
     print(json.dumps({"feature_count": metadata["feature_count"], "classes": metadata["class_mapping"], "dropped_columns": metadata["dropped_columns"]}, indent=2))
 
 
