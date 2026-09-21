@@ -80,7 +80,7 @@ python -m src.fl --config configs/baseline.yaml --dataset-name edge_iiotset --ou
 
 Each row records the client count, alpha, global round, evaluation metrics, communication bytes, and round time. The `clients` column is `NA` for centralized experiments.
 
-### Day 3 security primitives
+### security primitives
 
 `src/attacks.py` provides reproducible label flipping, sign-flip/scaling updates, and feature-trigger backdoors. `src/defense.py` provides cosine-similarity and norm screening, exponential reputation updates, committee validation by validation loss, and clean aggregation baselines: FedAvg, Krum, coordinate-wise median, and trimmed mean. These functions operate on PyTorch state dictionaries so the same pseudocode can be reused by the FL loop.
 
@@ -90,7 +90,7 @@ The integrated poisoning loop is exposed through `src.fl` with `--attack` values
 python -m src.fl --config configs/baseline.yaml --clients 10 --alphas 0.5 --attack sign_flip --defense reputation --output results/edge_iiotset_sign_flip_reputation.csv
 ```
 
-### Day 4 integrity and ledger safety net
+### integrity and ledger safety net
 
 `src/crypto.py` provides canonical SHA-256 payload/state hashes and Ed25519 signatures. `src/ledger.py` provides an append-only signed hash chain with JSON persistence and tamper verification. The safety-net check is:
 
