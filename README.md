@@ -63,6 +63,10 @@ python -m src.fl --config configs/baseline.yaml --dataset-name edge_iiotset --ou
 
 Each row records the client count, alpha, global round, evaluation metrics, communication bytes, and round time. The `clients` column is `NA` for centralized experiments.
 
+### Day 3 security primitives
+
+`src/attacks.py` provides reproducible label flipping, sign-flip/scaling updates, and feature-trigger backdoors. `src/defense.py` provides cosine-similarity and norm screening, exponential reputation updates, committee validation by validation loss, and clean aggregation baselines: FedAvg, Krum, coordinate-wise median, and trimmed mean. These functions operate on PyTorch state dictionaries so the same pseudocode can be reused by the FL loop.
+
 ## Centralized baseline
 
 ```bash
