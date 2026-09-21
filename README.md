@@ -73,6 +73,28 @@ The integrated poisoning loop is exposed through `src.fl` with `--attack` values
 python -m src.fl --config configs/baseline.yaml --clients 10 --alphas 0.5 --attack sign_flip --defense reputation --output results/edge_iiotset_sign_flip_reputation.csv
 ```
 
+### Day 4 integrity and ledger safety net
+
+`src/crypto.py` provides canonical SHA-256 payload/state hashes and Ed25519 signatures. `src/ledger.py` provides an append-only signed hash chain with JSON persistence and tamper verification. The safety-net check is:
+
+```bash
+python -m py_compile src/*.py
+python - <<'PY'
+from pathlib import Path
+from src.crypto import generate_signing_key, sign_payload, verify_signature
+from src.ledger import SimulatedLedger
+
+private, public = generate_signing_key()
+payload = {"round": 1, "update_hash": "example"}
+signature = sign_payload(private, payload)
+ledger = SimulatedLedger(Path("/tmp/blockfed-ledger.json"))
+ledger.append_update("client-0", 1, payload["update_hash"], payload, signature, public)
+assert ledger.verify()
+PY
+```
+
+The Fabric contract handoff is in `fabric/chaincode/go/chaincode.go`; it defines update submission, validator votes, status, and reputation transactions. A live Fabric network remains deployment work because it needs Fabric binaries, certificates, channel configuration, and Docker services.
+
 ## Centralized baseline
 
 ```bash
