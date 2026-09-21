@@ -16,30 +16,36 @@ class FabricClient:
         self.channel = channel
         self.chaincode = chaincode
 
+        fabric_samples_dir = self.root_dir / "fabric-samples"
+        if not fabric_samples_dir.exists():
+            fallback_dir = Path("/Users/mirudhulam/blockfed-ids/fabric-samples")
+            if fallback_dir.exists():
+                fabric_samples_dir = fallback_dir
+
         local_bin = Path.home() / ".local" / "bin"
-        fabric_bin = self.root_dir / "fabric-samples" / "bin"
+        fabric_bin = fabric_samples_dir / "bin"
         current_path = os.environ.get("PATH", "")
         self.env = os.environ.copy()
         self.env["PATH"] = f"{local_bin}:{fabric_bin}:{current_path}"
-        self.env["FABRIC_CFG_PATH"] = str(self.root_dir / "fabric-samples" / "config")
+        self.env["FABRIC_CFG_PATH"] = str(fabric_samples_dir / "config")
         self.env["CORE_PEER_TLS_ENABLED"] = "true"
         self.env["CORE_PEER_LOCALMSPID"] = "Org1MSP"
         self.env["CORE_PEER_TLS_ROOTCERT_FILE"] = str(
-            self.root_dir / "fabric-samples" / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "peers" / "peer0.org1.example.com" / "tls" / "ca.crt"
+            fabric_samples_dir / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "peers" / "peer0.org1.example.com" / "tls" / "ca.crt"
         )
         self.env["CORE_PEER_MSPCONFIGPATH"] = str(
-            self.root_dir / "fabric-samples" / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "users" / "Admin@org1.example.com" / "msp"
+            fabric_samples_dir / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "users" / "Admin@org1.example.com" / "msp"
         )
         self.env["CORE_PEER_ADDRESS"] = "localhost:7051"
 
         self.orderer_ca = str(
-            self.root_dir / "fabric-samples" / "test-network" / "organizations" / "ordererOrganizations" / "example.com" / "orderers" / "orderer.example.com" / "msp" / "tlscacerts" / "tlsca.example.com-cert.pem"
+            fabric_samples_dir / "test-network" / "organizations" / "ordererOrganizations" / "example.com" / "orderers" / "orderer.example.com" / "msp" / "tlscacerts" / "tlsca.example.com-cert.pem"
         )
         self.org1_ca = str(
-            self.root_dir / "fabric-samples" / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "peers" / "peer0.org1.example.com" / "tls" / "ca.crt"
+            fabric_samples_dir / "test-network" / "organizations" / "peerOrganizations" / "org1.example.com" / "peers" / "peer0.org1.example.com" / "tls" / "ca.crt"
         )
         self.org2_ca = str(
-            self.root_dir / "fabric-samples" / "test-network" / "organizations" / "peerOrganizations" / "org2.example.com" / "peers" / "peer0.org2.example.com" / "tls" / "ca.crt"
+            fabric_samples_dir / "test-network" / "organizations" / "peerOrganizations" / "org2.example.com" / "peers" / "peer0.org2.example.com" / "tls" / "ca.crt"
         )
 
     def is_available(self) -> bool:
