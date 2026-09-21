@@ -14,3 +14,18 @@ rounds: 10
 local_epochs: 1
 client_counts: [10, 20]
 alphas: [0.1, 0.5, 1.0]
+malicious_fraction: 0.2
+attack_fraction: 0.3
+label_flip_source: 1
+label_flip_target: 0
+attack_scale: 5.0
+backdoor_target: 0
+backdoor_features: [0, 1, 2]
+backdoor_value: 1.0
+similarity_threshold: 0.0
+max_norm_multiplier: 2.0
+reputation_decay: 0.9
+reputation_minimum: 0.5
+committee_loss_tolerance: 0.0
+trim_fraction: 0.1
+krum_malicious_count: 1

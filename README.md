@@ -67,6 +67,12 @@ Each row records the client count, alpha, global round, evaluation metrics, comm
 
 `src/attacks.py` provides reproducible label flipping, sign-flip/scaling updates, and feature-trigger backdoors. `src/defense.py` provides cosine-similarity and norm screening, exponential reputation updates, committee validation by validation loss, and clean aggregation baselines: FedAvg, Krum, coordinate-wise median, and trimmed mean. These functions operate on PyTorch state dictionaries so the same pseudocode can be reused by the FL loop.
 
+The integrated poisoning loop is exposed through `src.fl` with `--attack` values `label_flip`, `sign_flip`, `scaling`, or `backdoor`, and `--defense` values `fedavg`, `similarity_norm`, `reputation`, `committee`, `median`, `trimmed_mean`, or `krum`. Day 3 results use 10 non-IID clients, alpha 0.5, 20% malicious clients, five global rounds, and are saved as one schema-complete CSV per attack/defense pair:
+
+```bash
+python -m src.fl --config configs/baseline.yaml --clients 10 --alphas 0.5 --attack sign_flip --defense reputation --output results/edge_iiotset_sign_flip_reputation.csv
+```
+
 ## Centralized baseline
 
 ```bash

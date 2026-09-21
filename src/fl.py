@@ -14,6 +14,8 @@ import yaml
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
+from src.attacks import backdoor_trigger, poison_labels, scale_update, sign_flip
+from src.defense import committee_validate, coordinate_median, fedavg, krum, reputation_filter, similarity_norm_filter, trimmed_mean, update_reputations
 from src.models import MLP, evaluate_model, model_size_kb, parameter_count
 from src.results import append_result
 
@@ -43,11 +45,16 @@ def _state_bytes(state: dict[str, torch.Tensor]) -> int:
 	return buffer.getbuffer().nbytes
 
 
-def _local_update(global_state, x_train, y_train, indices, model_factory, config, seed):
+def _local_update(global_state, x_train, y_train, indices, model_factory, config, seed, attack, malicious):
 	model = model_factory()
 	model.load_state_dict(global_state)
 	torch.manual_seed(seed)
-	loader = DataLoader(TensorDataset(torch.from_numpy(x_train[indices]), torch.from_numpy(y_train[indices]).long()), batch_size=int(config["batch_size"]), shuffle=True)
+	local_x, local_y = x_train[indices], y_train[indices]
+	if malicious and attack == "label_flip":
+		_, local_y = poison_labels(local_x, local_y, float(config["attack_fraction"]), int(config["label_flip_source"]), int(config["label_flip_target"]), seed)
+	elif malicious and attack == "backdoor":
+		local_x, local_y = backdoor_trigger(local_x, local_y, float(config["attack_fraction"]), int(config["backdoor_target"]), list(config["backdoor_features"]), float(config["backdoor_value"]), seed)
+	loader = DataLoader(TensorDataset(torch.from_numpy(local_x), torch.from_numpy(local_y).long()), batch_size=int(config["batch_size"]), shuffle=True)
 	optimizer = torch.optim.Adam(model.parameters(), lr=float(config["learning_rate"]), weight_decay=float(config["weight_decay"]))
 	criterion = nn.CrossEntropyLoss()
 	model.train()
@@ -56,15 +63,15 @@ def _local_update(global_state, x_train, y_train, indices, model_factory, config
 			optimizer.zero_grad(set_to_none=True)
 			criterion(model(features), labels).backward()
 			optimizer.step()
-	return {name: value.detach().clone() for name, value in model.state_dict().items()}, len(indices)
+	state = {name: value.detach().clone() for name, value in model.state_dict().items()}
+	if malicious and attack == "sign_flip":
+		state = sign_flip(state, global_state, float(config["attack_scale"]))
+	elif malicious and attack == "scaling":
+		state = scale_update(state, global_state, float(config["attack_scale"]))
+	return state, len(indices)
 
 
-def _fedavg(states, sample_counts):
-	total_samples = sum(sample_counts)
-	return {name: torch.stack([state[name].float() * count / total_samples for state, count in zip(states, sample_counts)]).sum(dim=0) for name in states[0]}
-
-
-def run_fedavg(x_train, y_train, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path):
+def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path, attack="none", defense="fedavg"):
 	"""Run FedAvg and append one standardized metrics row per global round."""
 	seed = int(config["seed"])
 	partitions = dirichlet_partitions(y_train, client_count, alpha, seed + client_count * 1000 + round(alpha * 100))
@@ -74,18 +81,39 @@ def run_fedavg(x_train, y_train, x_test, y_test, input_dim, class_count, config,
 	output_path = Path(output_path)
 	output_path.parent.mkdir(parents=True, exist_ok=True)
 	bytes_per_round = _state_bytes(global_state) * (client_count + 1)
+	reputations = [1.0] * client_count
 	rows = []
 	for round_number in range(1, int(config["rounds"]) + 1):
 		started = time.perf_counter()
 		client_states, sample_counts = [], []
 		for client_id, indices in enumerate(partitions):
-			state, count = _local_update(global_state, x_train, y_train, indices, model_factory, config, seed + round_number * 10000 + client_id)
+			malicious = client_id < int(round(client_count * float(config["malicious_fraction"])))
+			state, count = _local_update(global_state, x_train, y_train, indices, model_factory, config, seed + round_number * 10000 + client_id, attack, malicious)
 			client_states.append(state)
 			sample_counts.append(count)
-		global_state = _fedavg(client_states, sample_counts)
+		accepted = list(range(client_count))
+		if defense == "similarity_norm":
+			accepted = similarity_norm_filter(client_states, global_state, float(config["similarity_threshold"]), float(config["max_norm_multiplier"]))
+		elif defense == "reputation":
+			accepted = similarity_norm_filter(client_states, global_state, float(config["similarity_threshold"]), float(config["max_norm_multiplier"]))
+			reputations = update_reputations(reputations, [index in accepted for index in range(client_count)], float(config["reputation_decay"]))
+			accepted = reputation_filter(reputations, float(config["reputation_minimum"])) or accepted
+		elif defense == "committee":
+			accepted = committee_validate(model, torch.from_numpy(x_val), torch.from_numpy(y_val), client_states, float(config["committee_loss_tolerance"]))
+		filtered_states = [client_states[index] for index in accepted]
+		filtered_counts = [sample_counts[index] for index in accepted]
+		if defense in {"median", "trimmed_mean", "krum"}:
+			if defense == "median":
+				global_state = coordinate_median(filtered_states)
+			elif defense == "trimmed_mean":
+				global_state = trimmed_mean(filtered_states, float(config["trim_fraction"]))
+			else:
+				global_state = krum(filtered_states, min(int(config["krum_malicious_count"]), max((len(filtered_states) - 3) // 2, 0)))
+		else:
+			global_state = fedavg(filtered_states, filtered_counts)
 		model.load_state_dict(global_state)
 		metrics = evaluate_model(model, x_test, y_test)
-		row = {"dataset": dataset_name, "model": "mlp", "method": "fedavg", "clients": client_count, "attack": "none", "malicious_fraction": 0.0, "alpha": alpha, "seed": seed, "round": round_number, **{key: metrics[key] for key in ("accuracy", "macro_f1", "precision", "recall", "fpr")}, "params": parameter_count(model), "model_kb": round(model_size_kb(model), 3), "bytes_per_round": bytes_per_round, "round_time_s": round(time.perf_counter() - started, 3)}
+		row = {"dataset": dataset_name, "model": "mlp", "method": defense, "clients": client_count, "attack": attack, "malicious_fraction": float(config["malicious_fraction"]), "alpha": alpha, "seed": seed, "round": round_number, **{key: metrics[key] for key in ("accuracy", "macro_f1", "precision", "recall", "fpr")}, "params": parameter_count(model), "model_kb": round(model_size_kb(model), 3), "bytes_per_round": bytes_per_round, "round_time_s": round(time.perf_counter() - started, 3)}
 		append_result(output_path, row)
 		rows.append(row)
 		print(json.dumps({"clients": client_count, "alpha": alpha, "round": round_number, "accuracy": row["accuracy"], "macro_f1": row["macro_f1"], "fpr": row["fpr"]}))
@@ -99,11 +127,13 @@ def main() -> None:
 	parser.add_argument("--clients", type=int, nargs="+", default=None)
 	parser.add_argument("--alphas", type=float, nargs="+", default=None)
 	parser.add_argument("--output", default="results/edge_iiotset_fedavg_results.csv")
+	parser.add_argument("--attack", default="none", choices=["none", "label_flip", "sign_flip", "scaling", "backdoor"])
+	parser.add_argument("--defense", default="fedavg", choices=["fedavg", "similarity_norm", "reputation", "committee", "median", "trimmed_mean", "krum"])
 	args = parser.parse_args()
 	config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
 	processed = Path(config["processed_dir"])
 	x_train = np.load(processed / "X_train.npy"); y_train = np.load(processed / "y_train.npy")
-	x_test = np.load(processed / "X_test.npy"); y_test = np.load(processed / "y_test.npy")
+	x_val = np.load(processed / "X_val.npy"); y_val = np.load(processed / "y_val.npy"); x_test = np.load(processed / "X_test.npy"); y_test = np.load(processed / "y_test.npy")
 	metadata = json.loads((processed / "metadata.json").read_text(encoding="utf-8"))
 	clients = args.clients or config.get("client_counts", [10, 20])
 	alphas = args.alphas or config.get("alphas", [0.1, 0.5, 1.0])
@@ -112,7 +142,7 @@ def main() -> None:
 		output.unlink()
 	for client_count in clients:
 		for alpha in alphas:
-			run_fedavg(x_train, y_train, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output)
+			run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output, args.attack, args.defense)
 
 
 if __name__ == "__main__":
