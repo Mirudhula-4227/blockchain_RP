@@ -53,6 +53,16 @@ python -m src.train_baseline --config configs/edge_iiotset.yaml --dataset-name e
 
 This produces `results/edge_iiotset_results.csv` using the same schema as the ToN-IoT comparison.
 
+### Clean FedAvg
+
+Run the requested non-IID matrix of 10 and 20 clients with Dirichlet alpha values 0.1, 0.5, and 1.0:
+
+```bash
+python -m src.fl --config configs/baseline.yaml --dataset-name edge_iiotset --output results/edge_iiotset_fedavg_results.csv
+```
+
+Each row records the client count, alpha, global round, evaluation metrics, communication bytes, and round time. The `clients` column is `NA` for centralized experiments.
+
 ## Centralized baseline
 
 ```bash
@@ -62,7 +72,7 @@ python -m src.train_baseline --config configs/baseline.yaml
 Outputs include a dataset-specific results CSV, a JSON classification report, and the PyTorch state dict. Every experiment must preserve this CSV schema:
 
 ```text
-dataset,model,method,attack,malicious_fraction,alpha,seed,round,accuracy,macro_f1,precision,recall,fpr,params,model_kb,bytes_per_round,round_time_s
+dataset,model,method,clients,attack,malicious_fraction,alpha,seed,round,accuracy,macro_f1,precision,recall,fpr,params,model_kb,bytes_per_round,round_time_s
 ```
 
 `NA` is used where a field does not apply, such as attack and round fields for centralized training.

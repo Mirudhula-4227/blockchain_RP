@@ -10,3 +10,7 @@ epochs: 30
 batch_size: 256
 learning_rate: 0.001
 weight_decay: 0.00001
+rounds: 10
+local_epochs: 1
+client_counts: [10, 20]
+alphas: [0.1, 0.5, 1.0]
