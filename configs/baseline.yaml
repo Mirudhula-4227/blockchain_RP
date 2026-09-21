@@ -1,7 +1,7 @@
-dataset: data/raw/pb_fdgan.csv
-processed_dir: data/processed/pb_fdgan
-label_column: label
-drop_columns: []
+dataset: data/raw/edge_iiotset.csv
+processed_dir: data/processed/edge_iiotset
+label_column: Attack_type
+drop_columns: [Attack_label, frame.time, ip.src_host, ip.dst_host, http.request.full_uri, tcp.options, tcp.payload, tcp.srcport]
 seed: 42
 validation_size: 0.15
 test_size: 0.15

@@ -28,30 +28,30 @@ Docker prerequisite: run `docker run --rm hello-world` after installing Docker D
 
 ## Dataset handoff
 
-The base-paper dataset is **PB-fdGAN**. Download its labeled source file as `data/raw/pb_fdgan.csv` and set `label_column` plus any additional leaky target columns in `configs/baseline.yaml` after inspecting the file header. Do not commit raw data. The current ToN-IoT network run is retained as a fallback/comparison experiment, not as the base-paper result.
+The primary dataset is **Edge-IIoTset**. Its verified labeled ML CSV is stored locally as `data/raw/edge_iiotset.csv` and is excluded from Git. The standard multiclass target is `Attack_type`; the binary target is `Attack_label` and is excluded from features. The current ToN-IoT network run is retained as a comparison experiment. PB-fdGAN is retained as a paper/method reference until its actual dataset identity is confirmed.
 
 The fallback source is **ToN-IoT**, the official UNSW Industry 4.0/IIoT dataset. Its official project page is [UNSW ToN-IoT Datasets](https://research.unsw.edu.au/projects/toniot-datasets), which links the academic-use download archive.
 
 The official UNSW page describes raw, processed, train/test, feature-description, and ground-truth directories. Prefer the processed or train/test CSV that contains the selected label column. If the downloaded archive has multiple files, choose one documented dataset slice and record its exact filename in the experiment notes before combining files.
 
-Inspect and process it:
+To process the primary dataset:
 
 ```bash
-python -m src.data data/raw/pb_fdgan.csv data/processed/pb_fdgan --label-column label
+python -m src.data data/raw/edge_iiotset.csv data/processed/edge_iiotset --label-column Attack_type --drop-column Attack_label --drop-column frame.time --drop-column ip.src_host --drop-column ip.dst_host --drop-column http.request.full_uri --drop-column tcp.options --drop-column tcp.payload --drop-column tcp.srcport
 ```
 
-The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/pb_fdgan/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.
+The pipeline logs row and class counts at load, leaky-column removal, deduplication, label creation, and transformed split stages in `data/processed/edge_iiotset/metadata.json`. It removes duplicates before splitting and fits imputers, one-hot encoders, and scalers on training data only.
 
-### Edge-IIoTset comparison
+### Edge-IIoTset source
 
-Download the labeled Edge-IIoTset CSV from the public [Kaggle dataset mirror](https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot) and place it at `data/raw/edge_iiotset.csv`. The comparison config assumes the standard multiclass column `Attack_type` and binary column `Attack_label`; this archive was confirmed to contain both. Verify any future replacement file with `python -c "import pandas as pd; print(pd.read_csv('data/raw/edge_iiotset.csv', nrows=0).columns.tolist())"` before running:
+Download the labeled Edge-IIoTset CSV from the public [Kaggle dataset mirror](https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot) and place it at `data/raw/edge_iiotset.csv`. The archive was confirmed to contain `Attack_type` and `Attack_label`. Verify any future replacement file with `python -c "import pandas as pd; print(pd.read_csv('data/raw/edge_iiotset.csv', nrows=0).columns.tolist())"` before running:
 
 ```bash
 python -m src.data data/raw/edge_iiotset.csv data/processed/edge_iiotset --label-column Attack_type --drop-column Attack_label --drop-column frame.time --drop-column ip.src_host --drop-column ip.dst_host --drop-column http.request.full_uri --drop-column tcp.options --drop-column tcp.payload --drop-column tcp.srcport
 python -m src.train_baseline --config configs/edge_iiotset.yaml --dataset-name edge_iiotset
 ```
 
-This produces `results/edge_iiotset_results.csv` using the same schema as PB-fdGAN and ToN-IoT.
+This produces `results/edge_iiotset_results.csv` using the same schema as the ToN-IoT comparison.
 
 ## Centralized baseline
 
