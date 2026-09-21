@@ -37,7 +37,14 @@ func (s *SmartContract) SubmitUpdate(ctx contractapi.TransactionContextInterface
 	if id == "" || clientID == "" || updateHash == "" || signature == "" { return fmt.Errorf("id, clientID, hash, and signature are required") }
 	key, err := ctx.GetStub().CreateCompositeKey("update", []string{id}); if err != nil { return err }
 	exists, err := ctx.GetStub().GetState(key); if err != nil { return err }; if exists != nil { return fmt.Errorf("update %s already exists", id) }
-	update := Update{ID: id, ClientID: clientID, Round: round, Hash: updateHash, Signature: signature, Status: "pending", CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	txTimestamp, err := ctx.GetStub().GetTxTimestamp()
+	var createdAt string
+	if err == nil && txTimestamp != nil {
+		createdAt = time.Unix(txTimestamp.Seconds, int64(txTimestamp.Nanos)).UTC().Format(time.RFC3339)
+	} else {
+		createdAt = time.Unix(0, 0).UTC().Format(time.RFC3339)
+	}
+	update := Update{ID: id, ClientID: clientID, Round: round, Hash: updateHash, Signature: signature, Status: "pending", CreatedAt: createdAt}
 	data, err := json.Marshal(update); if err != nil { return err }; return ctx.GetStub().PutState(key, data)
 }
 
@@ -62,7 +69,14 @@ func (s *SmartContract) Status(ctx contractapi.TransactionContextInterface, upda
 func (s *SmartContract) SetReputation(ctx contractapi.TransactionContextInterface, clientID string, score float64) error {
 	if score < 0 || score > 1 { return fmt.Errorf("reputation score must be in [0,1]") }
 	key, err := ctx.GetStub().CreateCompositeKey("reputation", []string{clientID}); if err != nil { return err }
-	data, err := json.Marshal(Reputation{ClientID: clientID, Score: score, UpdatedAt: time.Now().UTC().Format(time.RFC3339)}); if err != nil { return err }
+	txTimestamp, err := ctx.GetStub().GetTxTimestamp()
+	var updatedAt string
+	if err == nil && txTimestamp != nil {
+		updatedAt = time.Unix(txTimestamp.Seconds, int64(txTimestamp.Nanos)).UTC().Format(time.RFC3339)
+	} else {
+		updatedAt = time.Unix(0, 0).UTC().Format(time.RFC3339)
+	}
+	data, err := json.Marshal(Reputation{ClientID: clientID, Score: score, UpdatedAt: updatedAt}); if err != nil { return err }
 	return ctx.GetStub().PutState(key, data)
 }
 

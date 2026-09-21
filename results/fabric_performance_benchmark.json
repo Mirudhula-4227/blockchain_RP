@@ -1,0 +1,102 @@
+{
+  "fabric_available": true,
+  "latency_ms": {
+    "SubmitUpdate": {
+      "mean_ms": 65.08395820274018,
+      "std_ms": 11.168415624106869,
+      "min_ms": 55.435540998587385,
+      "max_ms": 86.85558300931007,
+      "p95_ms": 82.08605820545927
+    },
+    "Status": {
+      "mean_ms": 48.19410820491612,
+      "std_ms": 1.8184290551247222,
+      "min_ms": 46.129416004987434,
+      "max_ms": 51.02429099497385,
+      "p95_ms": 50.67328279837966
+    },
+    "Vote": {
+      "mean_ms": 3275.0578584033065,
+      "std_ms": 13.017009115468248,
+      "min_ms": 3261.540417006472,
+      "max_ms": 3296.176582982298,
+      "p95_ms": 3293.744474585401
+    },
+    "SetReputation": {
+      "mean_ms": 63.07066660374403,
+      "std_ms": 13.667091922839914,
+      "min_ms": 53.54425002587959,
+      "max_ms": 90.11999997892417,
+      "p95_ms": 84.02406658278778
+    },
+    "Reputation": {
+      "mean_ms": 45.99920019390993,
+      "std_ms": 0.7728706299824515,
+      "min_ms": 45.24779197527096,
+      "max_ms": 47.47304201009683,
+      "p95_ms": 47.15566700324416
+    }
+  },
+  "throughput_tps": {
+    "transactions_submitted": 10,
+    "successful_transactions": 10,
+    "total_duration_s": 0.539,
+    "tps": 18.56
+  },
+  "storage": {
+    "raw_model_size_kb": 319.986,
+    "ledger_entry_size_bytes": 314,
+    "ledger_entry_size_kb": 0.3066,
+    "bandwidth_reduction_factor": 1043.66,
+    "hash_algorithm": "SHA-256",
+    "signature_algorithm": "Ed25519"
+  },
+  "client_scaling": [
+    {
+      "clients": 2,
+      "simulated_tx": 2,
+      "duration_s": 0.202,
+      "estimated_round_ledger_overhead_kb": 0.5
+    },
+    {
+      "clients": 5,
+      "simulated_tx": 5,
+      "duration_s": 0.498,
+      "estimated_round_ledger_overhead_kb": 1.25
+    },
+    {
+      "clients": 10,
+      "simulated_tx": 10,
+      "duration_s": 0.997,
+      "estimated_round_ledger_overhead_kb": 2.5
+    },
+    {
+      "clients": 20,
+      "simulated_tx": 10,
+      "duration_s": 1.163,
+      "estimated_round_ledger_overhead_kb": 5.0
+    },
+    {
+      "clients": 50,
+      "simulated_tx": 10,
+      "duration_s": 1.016,
+      "estimated_round_ledger_overhead_kb": 12.5
+    },
+    {
+      "clients": 100,
+      "simulated_tx": 10,
+      "duration_s": 1.018,
+      "estimated_round_ledger_overhead_kb": 25.0
+    }
+  ],
+  "raspberry_pi_edge_simulation": {
+    "target_hardware": "Raspberry Pi 4 Model B (ARM Cortex-A72 @ 1.5GHz)",
+    "memory_ram_mb": 2048,
+    "ed25519_sign_time_ms": 0.103,
+    "ed25519_verify_time_ms": 0.206,
+    "sha256_hash_time_ms": 0.42,
+    "network_payload_tx_kb": 0.25,
+    "cpu_usage_pct_during_round": 4.5,
+    "peak_ram_mb": 142.5
+  }
+}

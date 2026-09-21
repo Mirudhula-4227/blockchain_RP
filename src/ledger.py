@@ -64,3 +64,24 @@ class SimulatedLedger:
 		if self.path:
 			self.path.parent.mkdir(parents=True, exist_ok=True)
 			self.path.write_text(json.dumps([asdict(entry) for entry in self.entries], indent=2), encoding="utf-8")
+
+
+class FabricLedger(SimulatedLedger):
+	"""Extends SimulatedLedger to submit updates to a live Hyperledger Fabric network."""
+
+	def __init__(self, path: str | Path | None = None, fabric_client: Any | None = None) -> None:
+		super().__init__(path)
+		if fabric_client is None:
+			from src.fabric_client import FabricClient
+			fabric_client = FabricClient()
+		self.fabric_client = fabric_client
+
+	def append_update(self, client_id: str, round_number: int, update_hash: str, payload: dict[str, Any], signature: str, public_key: Ed25519PublicKey) -> LedgerEntry:
+		entry = super().append_update(client_id, round_number, update_hash, payload, signature, public_key)
+		if self.fabric_client and self.fabric_client.is_available():
+			update_id = f"up-r{round_number}-{client_id}-{entry.index}"
+			self.fabric_client.submit_update(update_id, client_id, round_number, update_hash, signature)
+			self.fabric_client.vote(update_id, "validator-1", True)
+			self.fabric_client.vote(update_id, "validator-2", True)
+		return entry
+

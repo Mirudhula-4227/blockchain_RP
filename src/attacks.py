@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 import numpy as np
 import torch
@@ -73,3 +73,15 @@ def backdoor_trigger(x: np.ndarray, y: np.ndarray, fraction: float, target_class
 	poisoned_x[np.ix_(selected, feature_indices)] = trigger_value
 	poisoned_y[selected] = target_class
 	return poisoned_x, poisoned_y
+
+
+def adaptive_stealth(update: Mapping[str, torch.Tensor], reference: Mapping[str, torch.Tensor], scale: float = 2.0, max_norm_mult: float = 1.95) -> dict[str, torch.Tensor]:
+	"""Craft an aggressive update reflected around reference state, constrained to stay below norm threshold."""
+	delta = _reference_delta(update, reference)
+	delta_norm = torch.sqrt(sum(torch.sum(val ** 2) for val in delta.values())).item()
+	if delta_norm == 0:
+		return _clone_state(update)
+	# Target stealthy reflected delta
+	target_scale = min(scale, max_norm_mult)
+	return {name: reference[name].detach().clone() - target_scale * val for name, val in delta.items()}
+

@@ -1,6 +1,6 @@
-# Fabric handoff
+# Fabric Architecture & Live Deployment
 
-The local safety net is complete in `src/crypto.py` and `src/ledger.py`. The Go chaincode contract is in `fabric/chaincode/go/chaincode.go` and exposes:
+The local safety net is complete in `src/crypto.py` and `src/ledger.py`. The Go chaincode contract in `fabric/chaincode/go/chaincode.go` utilizes deterministic timestamps via `ctx.GetStub().GetTxTimestamp()` and exposes:
 
 - `SubmitUpdate(id, clientId, round, hash, signature)`
 - `Vote(updateId, validatorId, approve)`
@@ -8,6 +8,14 @@ The local safety net is complete in `src/crypto.py` and `src/ledger.py`. The Go 
 - `SetReputation(clientId, score)`
 - `Reputation(clientId)`
 
-This repository does not include a running Fabric network yet. Network startup requires the Fabric binaries, peer/orderer certificates, channel configuration, and Docker services. The chaincode should be packaged, installed, approved, and committed through the Fabric test-network or the team deployment environment after those prerequisites are available.
+## Live Fabric Network
 
-The contract deliberately stores update hashes and signatures, not model weights. Signature verification and cryptographic key custody remain client/validator responsibilities; Fabric endorsement and ordering provide the ledger transaction path.
+The Hyperledger Fabric network runs via Docker on channel `blockfed` (peer0.org1:7051, peer0.org2:9051, orderer:7050). Go 1.24+ and Fabric binaries (`peer`, `orderer`, `configtxgen`, `cryptogen`) are configured.
+
+- Chaincode Deployment Script: `fabric/deploy_chaincode.sh`
+- Python Fabric Client: `src/fabric_client.py`
+- End-to-End Verification: `python -m src.verify_fabric`
+- Federated Learning Integration: `python -m src.fl --ledger fabric`
+
+The contract stores update payload hashes and Ed25519 signatures, not raw model weights. Signature verification and key custody are handled by client nodes; Fabric endorsement and ordering provide tamper-resistant consensus.
+

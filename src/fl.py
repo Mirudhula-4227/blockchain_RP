@@ -14,8 +14,10 @@ import yaml
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from src.attacks import backdoor_trigger, poison_labels, scale_update, sign_flip
+from src.attacks import adaptive_stealth, backdoor_trigger, poison_labels, scale_update, sign_flip
+from src.crypto import generate_signing_key, hash_state, sign_payload
 from src.defense import committee_validate, coordinate_median, fedavg, krum, reputation_filter, similarity_norm_filter, trimmed_mean, update_reputations
+from src.ledger import FabricLedger, SimulatedLedger
 from src.models import MLP, evaluate_model, model_size_kb, parameter_count
 from src.results import append_result
 
@@ -68,12 +70,14 @@ def _local_update(global_state, x_train, y_train, indices, model_factory, config
 		state = sign_flip(state, global_state, float(config["attack_scale"]))
 	elif malicious and attack == "scaling":
 		state = scale_update(state, global_state, float(config["attack_scale"]))
+	elif malicious and attack == "adaptive":
+		state = adaptive_stealth(state, global_state, float(config["attack_scale"]), float(config.get("max_norm_multiplier", 1.95)))
 	return state, len(indices)
 
 
-def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path, attack="none", defense="fedavg"):
+def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path, attack="none", defense="fedavg", ledger_type="simulated", custom_seed=None):
 	"""Run FedAvg and append one standardized metrics row per global round."""
-	seed = int(config["seed"])
+	seed = int(custom_seed if custom_seed is not None else config["seed"])
 	partitions = dirichlet_partitions(y_train, client_count, alpha, seed + client_count * 1000 + round(alpha * 100))
 	model_factory = lambda: MLP(input_dim, class_count, config["hidden_dims"])
 	model = model_factory()
@@ -83,6 +87,13 @@ def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_
 	bytes_per_round = _state_bytes(global_state) * (client_count + 1)
 	reputations = [1.0] * client_count
 	rows = []
+
+	keys = [generate_signing_key() for _ in range(client_count)]
+	if ledger_type == "fabric":
+		ledger = FabricLedger(Path("/tmp/blockfed-ledger.json"))
+	else:
+		ledger = SimulatedLedger(Path("/tmp/blockfed-ledger.json"))
+
 	for round_number in range(1, int(config["rounds"]) + 1):
 		started = time.perf_counter()
 		client_states, sample_counts = [], []
@@ -91,6 +102,13 @@ def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_
 			state, count = _local_update(global_state, x_train, y_train, indices, model_factory, config, seed + round_number * 10000 + client_id, attack, malicious)
 			client_states.append(state)
 			sample_counts.append(count)
+
+			priv_key, pub_key = keys[client_id]
+			u_hash = hash_state(state)
+			payload = {"round": round_number, "client_id": f"client-{client_id}", "update_hash": u_hash}
+			sig = sign_payload(priv_key, payload)
+			ledger.append_update(f"client-{client_id}", round_number, u_hash, payload, sig, pub_key)
+
 		accepted = list(range(client_count))
 		if defense == "similarity_norm":
 			accepted = similarity_norm_filter(client_states, global_state, float(config["similarity_threshold"]), float(config["max_norm_multiplier"]))
@@ -116,7 +134,7 @@ def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_
 		row = {"dataset": dataset_name, "model": "mlp", "method": defense, "clients": client_count, "attack": attack, "malicious_fraction": float(config["malicious_fraction"]), "alpha": alpha, "seed": seed, "round": round_number, **{key: metrics[key] for key in ("accuracy", "macro_f1", "precision", "recall", "fpr")}, "params": parameter_count(model), "model_kb": round(model_size_kb(model), 3), "bytes_per_round": bytes_per_round, "round_time_s": round(time.perf_counter() - started, 3)}
 		append_result(output_path, row)
 		rows.append(row)
-		print(json.dumps({"clients": client_count, "alpha": alpha, "round": round_number, "accuracy": row["accuracy"], "macro_f1": row["macro_f1"], "fpr": row["fpr"]}))
+		print(json.dumps({"clients": client_count, "alpha": alpha, "seed": seed, "round": round_number, "accuracy": row["accuracy"], "macro_f1": row["macro_f1"], "fpr": row["fpr"]}))
 	return rows
 
 
@@ -126,9 +144,11 @@ def main() -> None:
 	parser.add_argument("--dataset-name", default="edge_iiotset")
 	parser.add_argument("--clients", type=int, nargs="+", default=None)
 	parser.add_argument("--alphas", type=float, nargs="+", default=None)
+	parser.add_argument("--seeds", type=int, nargs="+", default=None)
 	parser.add_argument("--output", default="results/edge_iiotset_fedavg_results.csv")
-	parser.add_argument("--attack", default="none", choices=["none", "label_flip", "sign_flip", "scaling", "backdoor"])
+	parser.add_argument("--attack", default="none", choices=["none", "label_flip", "sign_flip", "scaling", "backdoor", "adaptive"])
 	parser.add_argument("--defense", default="fedavg", choices=["fedavg", "similarity_norm", "reputation", "committee", "median", "trimmed_mean", "krum"])
+	parser.add_argument("--ledger", default="simulated", choices=["simulated", "fabric"])
 	args = parser.parse_args()
 	config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
 	processed = Path(config["processed_dir"])
@@ -137,12 +157,14 @@ def main() -> None:
 	metadata = json.loads((processed / "metadata.json").read_text(encoding="utf-8"))
 	clients = args.clients or config.get("client_counts", [10, 20])
 	alphas = args.alphas or config.get("alphas", [0.1, 0.5, 1.0])
+	seeds = args.seeds or [int(config["seed"])]
 	output = Path(args.output)
 	if output.exists():
 		output.unlink()
-	for client_count in clients:
-		for alpha in alphas:
-			run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output, args.attack, args.defense)
+	for s in seeds:
+		for client_count in clients:
+			for alpha in alphas:
+				run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output, args.attack, args.defense, args.ledger, custom_seed=s)
 
 
 if __name__ == "__main__":

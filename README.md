@@ -24,7 +24,24 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Docker prerequisite: run `docker run --rm hello-world` after installing Docker Desktop. Fabric is intentionally deferred.
+Docker prerequisite: run `docker run --rm hello-world` after installing Docker Desktop. Go 1.24+ and Hyperledger Fabric binaries (`peer`, `orderer`, `configtxgen`, `cryptogen`) are configured.
+
+### Hyperledger Fabric Network & Ledger
+
+The Go smart contract is in `fabric/chaincode/go/chaincode.go` and deployed on channel `blockfed`. Deterministic state updates are processed via `ctx.GetStub().GetTxTimestamp()`.
+
+To deploy/upgrade chaincode or run verification:
+
+```bash
+# Package, install, approve, and commit chaincode
+./fabric/deploy_chaincode.sh
+
+# Run Python Fabric client end-to-end verification
+python -m src.verify_fabric
+
+# Run Federated Learning with live Fabric ledger logging
+python -m src.fl --config configs/baseline.yaml --clients 2 --alphas 0.5 --output results/test_fabric_fl.csv --ledger fabric
+```
 
 ## Dataset handoff
 
@@ -93,7 +110,7 @@ assert ledger.verify()
 PY
 ```
 
-The Fabric contract handoff is in `fabric/chaincode/go/chaincode.go`; it defines update submission, validator votes, status, and reputation transactions. A live Fabric network remains deployment work because it needs Fabric binaries, certificates, channel configuration, and Docker services.
+The Fabric contract is implemented in `fabric/chaincode/go/chaincode.go`; it defines update submission, validator votes, status, and reputation transactions with deterministic timestamps (`ctx.GetStub().GetTxTimestamp()`). A live Hyperledger Fabric network is active on channel `blockfed` (peer0.org1, peer0.org2, orderer) and integrated with the Python FL training loop via `FabricClient` in `src/fabric_client.py`.
 
 ## Centralized baseline
 
