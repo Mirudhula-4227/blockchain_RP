@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.attacks import adaptive_stealth, backdoor_trigger, poison_labels, scale_update, sign_flip
 from src.crypto import generate_signing_key, hash_state, sign_payload
 from src.defense import committee_validate, coordinate_median, fedavg, krum, reputation_filter, similarity_norm_filter, trimmed_mean, update_reputations
+from src.dp import clip_and_add_noise
 from src.ledger import FabricLedger, SimulatedLedger
 from src.models import MLP, evaluate_model, model_size_kb, parameter_count
 from src.results import append_result
@@ -47,7 +48,7 @@ def _state_bytes(state: dict[str, torch.Tensor]) -> int:
 	return buffer.getbuffer().nbytes
 
 
-def _local_update(global_state, x_train, y_train, indices, model_factory, config, seed, attack, malicious):
+def _local_update(global_state, x_train, y_train, indices, model_factory, config, seed, attack, malicious, dp_enabled=False, dp_clip_norm=1.0, dp_noise_multiplier=0.01):
 	model = model_factory()
 	model.load_state_dict(global_state)
 	torch.manual_seed(seed)
@@ -72,10 +73,13 @@ def _local_update(global_state, x_train, y_train, indices, model_factory, config
 		state = scale_update(state, global_state, float(config["attack_scale"]))
 	elif malicious and attack == "adaptive":
 		state = adaptive_stealth(state, global_state, float(config["attack_scale"]), float(config.get("max_norm_multiplier", 1.95)))
+	if dp_enabled:
+		state = clip_and_add_noise(state, global_state, clip_norm=dp_clip_norm, noise_multiplier=dp_noise_multiplier, seed=seed)
 	return state, len(indices)
 
 
-def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path, attack="none", defense="fedavg", ledger_type="simulated", custom_seed=None):
+
+def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_count, config, dataset_name, client_count, alpha, output_path, attack="none", defense="fedavg", ledger_type="simulated", custom_seed=None, dp_enabled=False, dp_clip_norm=1.0, dp_noise_multiplier=0.01):
 	"""Run FedAvg and append one standardized metrics row per global round."""
 	seed = int(custom_seed if custom_seed is not None else config["seed"])
 	partitions = dirichlet_partitions(y_train, client_count, alpha, seed + client_count * 1000 + round(alpha * 100))
@@ -99,7 +103,7 @@ def run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, input_dim, class_
 		client_states, sample_counts = [], []
 		for client_id, indices in enumerate(partitions):
 			malicious = client_id < int(round(client_count * float(config["malicious_fraction"])))
-			state, count = _local_update(global_state, x_train, y_train, indices, model_factory, config, seed + round_number * 10000 + client_id, attack, malicious)
+			state, count = _local_update(global_state, x_train, y_train, indices, model_factory, config, seed + round_number * 10000 + client_id, attack, malicious, dp_enabled, dp_clip_norm, dp_noise_multiplier)
 			client_states.append(state)
 			sample_counts.append(count)
 
@@ -149,6 +153,9 @@ def main() -> None:
 	parser.add_argument("--attack", default="none", choices=["none", "label_flip", "sign_flip", "scaling", "backdoor", "adaptive"])
 	parser.add_argument("--defense", default="fedavg", choices=["fedavg", "similarity_norm", "reputation", "committee", "median", "trimmed_mean", "krum"])
 	parser.add_argument("--ledger", default="simulated", choices=["simulated", "fabric"])
+	parser.add_argument("--dp", action="store_true", help="Enable Differential Privacy (DP-FedAvg)")
+	parser.add_argument("--dp-clip-norm", type=float, default=1.0)
+	parser.add_argument("--dp-noise", type=float, default=0.01)
 	args = parser.parse_args()
 	config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
 	processed = Path(config["processed_dir"])
@@ -164,8 +171,9 @@ def main() -> None:
 	for s in seeds:
 		for client_count in clients:
 			for alpha in alphas:
-				run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output, args.attack, args.defense, args.ledger, custom_seed=s)
+				run_fedavg(x_train, y_train, x_val, y_val, x_test, y_test, x_train.shape[1], len(metadata["class_mapping"]), config, args.dataset_name, client_count, alpha, output, args.attack, args.defense, args.ledger, custom_seed=s, dp_enabled=args.dp, dp_clip_norm=args.dp_clip_norm, dp_noise_multiplier=args.dp_noise)
 
 
 if __name__ == "__main__":
 	main()
+

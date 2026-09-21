@@ -63,7 +63,8 @@ class SimulatedLedger:
 	def _save(self) -> None:
 		if self.path:
 			self.path.parent.mkdir(parents=True, exist_ok=True)
-			self.path.write_text(json.dumps([asdict(entry) for entry in self.entries], indent=2), encoding="utf-8")
+			recent = self.entries[-50:]
+			self.path.write_text(json.dumps([asdict(entry) for entry in recent], separators=(",", ":")), encoding="utf-8")
 
 
 class FabricLedger(SimulatedLedger):
